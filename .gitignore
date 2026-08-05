@@ -1,0 +1,55 @@
+# Environment
+.env
+backend/.env
+frontend/.env
+
+# Dependencies
+node_modules/
+vendor/
+
+# Build output
+frontend/dist/
+backend/public/build/
+backend/public/hot/
+
+# Docker volumes
+mysql_data/
+redis_data/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+backend/storage/logs/*.log
+
+# PHPUnit
+.phpunit.result.cache
+backend/.phpunit.cache/
+
+# Backend storage (keep directory structure, ignore contents)
+backend/storage/app/public/*
+backend/storage/framework/cache/data/*
+backend/storage/framework/sessions/*
+backend/storage/framework/testing/*
+backend/storage/framework/views/*
+!backend/storage/app/public/.gitignore
+!backend/storage/framework/cache/data/.gitignore
+!backend/storage/framework/sessions/.gitignore
+!backend/storage/framework/testing/.gitignore
+!backend/storage/framework/views/.gitignore
+
+# Backend bootstrap cache
+backend/bootstrap/cache/*.php
+!backend/bootstrap/cache/.gitignore
+
+# SQLite
+*.sqlite

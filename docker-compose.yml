@@ -1,0 +1,80 @@
+services:
+  app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: indice-erp-app
+    restart: unless-stopped
+    volumes:
+      - ./backend:/var/www/html:cached
+      - ./backend/docker/php/php.ini:/usr/local/etc/php/conf.d/custom.ini:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=indice_erp
+      - DB_USERNAME=indice_erp
+      - REDIS_HOST=redis
+    networks:
+      - indice-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: indice-erp-nginx
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    volumes:
+      - ./backend:/var/www/html:ro
+      - ./backend/docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+    networks:
+      - indice-network
+
+  mysql:
+    image: mysql:8.0
+    container_name: indice-erp-mysql
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - MYSQL_DATABASE=indice_erp
+      - MYSQL_USER=indice_erp
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./backend/docker/mysql/my.cnf:/etc/mysql/conf.d/custom.cnf:ro
+    ports:
+      - "3307:3306"
+    networks:
+      - indice-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: indice-erp-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - indice-network
+
+networks:
+  indice-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  redis_data:
