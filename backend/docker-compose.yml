@@ -20,9 +20,9 @@ services:
       - FRONTEND_URL=http://localhost:5173
       - DB_HOST=mysql
       - DB_PORT=3306
-      - DB_DATABASE=indice_erp
-      - DB_USERNAME=indice_erp
-      - DB_PASSWORD=${DB_PASSWORD:-secret}
+      - DB_DATABASE=indice_db
+      - DB_USERNAME=root
+      - DB_PASSWORD=root
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - SESSION_DRIVER=redis
@@ -48,18 +48,15 @@ services:
 
   mysql:
     image: mysql:8.0
-    container_name: indice-erp-mysql
+    container_name: mysql8
     restart: unless-stopped
     environment:
-      - MYSQL_DATABASE=indice_erp
-      - MYSQL_USER=indice_erp
-      - MYSQL_PASSWORD=${DB_PASSWORD:-secret}
-      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-rootsecret}
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=indice_db
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./docker/mysql/my.cnf:/etc/mysql/conf.d/custom.cnf:ro
     ports:
-      - "3307:3306"
+      - "3390:3306"
     networks:
       - indice-network
     healthcheck:

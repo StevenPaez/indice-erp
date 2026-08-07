@@ -20,13 +20,8 @@ Mini ERP para gestion de compras y ventas de libros.
 ## Arranque rapido
 
 ```bash
-# 1. Clonar y entrar
 cd indice-erp
-
-# 2. Configurar variables de entorno
 cp .env.example .env
-
-# 3. Levantar todo
 chmod +x startup.sh
 ./startup.sh
 ```
@@ -36,11 +31,12 @@ El script levanta los contenedores (backend, MySQL, Redis), ejecuta migraciones 
 **URLs:**
 - Frontend: http://localhost:5173
 - API: http://localhost:8000
+- MySQL: localhost:3390 (user: root, db: indice_db)
 
 ## Arranque manual
 
 ```bash
-# Backend + base de datos
+# Backend + MySQL + Redis
 docker compose up -d --build
 docker compose exec app php artisan migrate
 

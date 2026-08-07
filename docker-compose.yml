@@ -13,13 +13,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-    env_file:
-      - .env
     environment:
       - DB_HOST=mysql
       - DB_PORT=3306
-      - DB_DATABASE=indice_erp
-      - DB_USERNAME=indice_erp
+      - DB_DATABASE=indice_db
+      - DB_USERNAME=root
+      - DB_PASSWORD=root
       - REDIS_HOST=redis
     networks:
       - indice-network
@@ -40,25 +39,23 @@ services:
 
   mysql:
     image: mysql:8.0
-    container_name: indice-erp-mysql
+    container_name: mysql8
     restart: unless-stopped
-    env_file:
-      - .env
     environment:
-      - MYSQL_DATABASE=indice_erp
-      - MYSQL_USER=indice_erp
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=indice_db
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./backend/docker/mysql/my.cnf:/etc/mysql/conf.d/custom.cnf:ro
     ports:
-      - "3307:3306"
+      - "3390:3306"
     networks:
       - indice-network
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 40s
 
   redis:
     image: redis:7-alpine
