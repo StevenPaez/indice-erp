@@ -1,61 +1,65 @@
 <template>
   <div class="auth-page">
-    <Card class="auth-card">
-      <template #title>
-        <div class="text-center mb-2">
-          <h2 class="text-2xl font-semibold text-surface-900">Indice ERP</h2>
-        </div>
-      </template>
-      <template #subtitle>
-        <div class="text-center text-surface-500 mb-6">Iniciar sesión</div>
-      </template>
-      <template #content>
-        <div class="flex flex-col gap-5">
-          <div class="flex flex-col gap-2">
-            <FloatLabel>
-              <InputText
-                id="email"
-                v-model="email"
-                type="email"
-                class="w-full"
-                :class="{ 'p-invalid': fieldErrors.email }"
-              />
-              <label for="email">Correo electrónico</label>
-            </FloatLabel>
-            <small v-if="fieldErrors.email" class="text-red-500">{{ fieldErrors.email }}</small>
-          </div>
+    <div class="auth-card">
+      <div class="auth-header">
+        <h1 class="auth-title">Iniciar sesión</h1>
+        <p class="auth-subtitle">Ingresa tus datos para acceder a tu cuenta</p>
+      </div>
 
-          <div class="flex flex-col gap-2">
-            <FloatLabel>
-              <InputText
-                id="password"
-                v-model="password"
-                type="password"
-                class="w-full"
-                :class="{ 'p-invalid': fieldErrors.password }"
-              />
-              <label for="password">Contraseña</label>
-            </FloatLabel>
-            <small v-if="fieldErrors.password" class="text-red-500">{{ fieldErrors.password }}</small>
-          </div>
-
-          <Button
-            label="Entrar"
-            icon="pi pi-sign-in"
-            @click="handleLogin"
-            :loading="loading"
-            class="w-full mt-2"
+      <form class="auth-form" @submit.prevent="handleLogin">
+        <div class="field-group">
+          <label for="login-email" class="field-label">Correo</label>
+          <InputText
+            id="login-email"
+            v-model="email"
+            type="email"
+            autocomplete="email"
+            placeholder="tucorreo@ejemplo.com"
+            class="w-full"
+            :class="{ 'p-invalid': fieldErrors.email }"
           />
-
-          <div v-if="generalError" class="text-red-500 text-sm text-center">{{ generalError }}</div>
-
-          <div class="text-center text-sm text-surface-500">
-            ¿No tienes cuenta?
-            <router-link to="/register" class="text-primary hover:underline">Regístrate</router-link>
-          </div>
+          <small v-if="fieldErrors.email" class="field-error">{{ fieldErrors.email }}</small>
         </div>
-      </template>
-    </Card>
+
+        <div class="field-group">
+          <label for="login-password" class="field-label">Contraseña</label>
+          <div class="password-wrapper">
+            <InputText
+              id="login-password"
+              v-model="password"
+              :type="showPassword ? 'text' : 'password'"
+              autocomplete="current-password"
+              placeholder="Tu contraseña"
+              class="w-full password-input"
+              :class="{ 'p-invalid': fieldErrors.password }"
+            />
+            <button
+              type="button"
+              class="password-toggle"
+              :aria-label="showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+              @click="showPassword = !showPassword"
+            >
+              <i :class="showPassword ? 'pi pi-eye-slash' : 'pi pi-eye'"></i>
+            </button>
+          </div>
+          <small v-if="fieldErrors.password" class="field-error">{{ fieldErrors.password }}</small>
+        </div>
+
+        <Button
+          type="submit"
+          label="Entrar"
+          :loading="loading"
+          class="w-full submit-btn"
+        />
+
+        <div v-if="generalError" class="general-error">{{ generalError }}</div>
+      </form>
+
+      <p class="auth-footer">
+        ¿No tienes cuenta?
+        <router-link to="/register" class="auth-link">Regístrate</router-link>
+      </p>
+    </div>
   </div>
 </template>
 
@@ -69,6 +73,7 @@ const authStore = useAuthStore();
 
 const email = ref('');
 const password = ref('');
+const showPassword = ref(false);
 const loading = ref(false);
 const generalError = ref(null);
 const fieldErrors = ref({});
@@ -97,24 +102,137 @@ async function handleLogin() {
 
 <style scoped>
 .auth-page {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--p-surface-100);
   padding: 1rem;
+  margin: 0;
+  box-sizing: border-box;
 }
+
 .auth-card {
   width: 100%;
-  max-width: 420px;
-  padding: 1.5rem;
+  max-width: 380px;
+  margin: 0 auto;
+  background: var(--p-surface-0, #fff);
+  border: 1px solid var(--p-surface-200, #e5e7eb);
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  padding: 2rem;
 }
-.auth-card :deep(.p-card-content) {
-  padding-top: 0.5rem;
+
+.auth-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  text-align: center;
+  margin-bottom: 1.5rem;
 }
-.text-primary {
+
+.auth-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--p-surface-900);
+  letter-spacing: -0.01em;
+}
+
+.auth-subtitle {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--p-surface-500);
+  line-height: 1.5;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.field-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--p-surface-700);
+  user-select: none;
+}
+
+.password-wrapper {
+  position: relative;
+}
+
+.password-input {
+  padding-right: 2.5rem;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 0.375rem;
+  background: transparent;
+  color: var(--p-surface-400);
+  cursor: pointer;
+  transition: color 0.15s ease;
+  padding: 0;
+}
+
+.password-toggle:hover {
+  color: var(--p-surface-600);
+}
+
+.password-toggle i {
+  font-size: 0.875rem;
+}
+
+.field-error {
+  font-size: 0.75rem;
+  color: var(--p-red-500, #ef4444);
+  line-height: 1.4;
+}
+
+.general-error {
+  font-size: 0.875rem;
+  color: var(--p-red-500, #ef4444);
+  text-align: center;
+}
+
+.submit-btn {
+  margin-top: 0.5rem;
+}
+
+.auth-footer {
+  margin: 0;
+  margin-top: 1.5rem;
+  font-size: 0.875rem;
+  text-align: center;
+  color: var(--p-surface-500);
+}
+
+.auth-link {
   color: var(--p-primary-color);
   text-decoration: none;
   font-weight: 500;
+}
+
+.auth-link:hover {
+  text-decoration: underline;
 }
 </style>
