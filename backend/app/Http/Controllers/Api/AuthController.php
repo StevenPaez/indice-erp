@@ -17,6 +17,16 @@ class AuthController
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ], [
+            'name.required' => 'El campo nombre es obligatorio.',
+            'name.max' => 'El nombre no debe superar los 255 caracteres.',
+            'email.required' => 'El campo correo electrónico es obligatorio.',
+            'email.email' => 'El correo electrónico debe ser una dirección válida.',
+            'email.max' => 'El correo electrónico no debe superar los 255 caracteres.',
+            'email.unique' => 'Este correo electrónico ya está registrado.',
+            'password.required' => 'El campo contraseña es obligatorio.',
+            'password.min' => 'La contraseña debe tener al menos 8 caracteres.',
+            'password.confirmed' => 'Las contraseñas no coinciden.',
         ]);
 
         $user = User::create([
@@ -33,6 +43,10 @@ class AuthController
         $validated = $request->validate([
             'email' => ['required', 'email'],
             'password' => ['required'],
+        ], [
+            'email.required' => 'El campo correo electrónico es obligatorio.',
+            'email.email' => 'El correo electrónico debe ser una dirección válida.',
+            'password.required' => 'El campo contraseña es obligatorio.',
         ]);
 
         $user = User::where('email', $validated['email'])->first();

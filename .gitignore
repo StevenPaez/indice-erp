@@ -34,6 +34,7 @@ backend/storage/logs/*.log
 # PHPUnit
 .phpunit.result.cache
 backend/.phpunit.cache/
+backend/indice_db
 
 # Backend storage (keep directory structure, ignore contents)
 backend/storage/app/public/*
