@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
@@ -35,6 +36,9 @@ class AuthController
             'password' => Hash::make($validated['password']),
         ]);
 
+        Auth::login($user);
+        $request->session()->regenerate();
+
         return response()->json($user, Response::HTTP_CREATED);
     }
 
@@ -57,12 +61,23 @@ class AuthController
             ]);
         }
 
+        Auth::login($user);
+        $request->session()->regenerate();
+
         return response()->json($user);
     }
 
     public function logout(Request $request): JsonResponse
     {
-        $request->user()->tokens()->delete();
+        // Sanctum uses a RequestGuard for token requests, which does not
+        // implement logout(). SPA requests are authenticated by the web guard.
+        if (Auth::guard('web')->check()) {
+            Auth::guard('web')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+        } elseif ($request->user()?->currentAccessToken()) {
+            $request->user()->currentAccessToken()->delete();
+        }
 
         return response()->json(null, Response::HTTP_NO_CONTENT);
     }

@@ -14,15 +14,17 @@ class AuthenticationTest extends TestCase
     #[Test]
     public function user_can_register(): void
     {
-        $response = $this->postJson('/api/register', [
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-            'password' => 'password',
-            'password_confirmation' => 'password',
-        ]);
+        $response = $this->withHeaders(['Origin' => 'http://localhost:5173'])
+            ->postJson('/api/register', [
+                'name' => 'Test User',
+                'email' => 'test@example.com',
+                'password' => 'password',
+                'password_confirmation' => 'password',
+            ]);
 
         $response->assertStatus(201);
         $this->assertDatabaseHas('users', ['email' => 'test@example.com']);
+        $this->assertAuthenticated();
     }
 
     #[Test]
@@ -33,12 +35,14 @@ class AuthenticationTest extends TestCase
             'password' => bcrypt('password'),
         ]);
 
-        $response = $this->postJson('/api/login', [
-            'email' => 'test@example.com',
-            'password' => 'password',
-        ]);
+        $response = $this->withHeaders(['Origin' => 'http://localhost:5173'])
+            ->postJson('/api/login', [
+                'email' => 'test@example.com',
+                'password' => 'password',
+            ]);
 
         $response->assertStatus(200);
+        $this->assertAuthenticatedAs($user);
     }
 
     #[Test]
