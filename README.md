@@ -1,139 +1,196 @@
-# Indice ERP
+# Índice ERP
 
-Mini ERP para gestión de compras y ventas de libros.
+Aplicación web para administrar un catálogo de libros, inventario y precios.
+El repositorio puede usarse como proyecto completo, punto de partida para otro
+ERP o ejemplo de una SPA autenticada con Laravel.
 
-## Arquitectura
+## Funcionalidades
 
-```text
-Navegador
-  └─ Netlify: Vue 3 SPA
-       ├─ archivos estáticos y rutas del frontend
-       └─ proxy /api/* y /sanctum/* (mismo origen)
-            └─ Laravel Cloud: API Laravel
-                 └─ Laravel MySQL
-```
+- Registro, inicio y cierre de sesión.
+- Autenticación SPA mediante Laravel Sanctum.
+- Consulta paginada de libros.
+- Búsqueda por título, autor o ISBN.
+- Alta, edición y eliminación lógica de libros.
+- Control de existencias y consulta de stock bajo.
+- Validación del backend con respuestas JSON.
+- Interfaz adaptable construida con componentes PrimeVue.
 
-El proxy de Netlify es intencional. La autenticación SPA de Laravel Sanctum
-requiere que frontend y API compartan el dominio superior. Los dominios
-`netlify.app` y `laravel.cloud` no lo comparten; el proxy mantiene las cookies
-de sesión y CSRF como cookies de primer nivel. En producción, el frontend no
-debe definir `VITE_API_URL`.
+## Tecnologías
 
-| Capa | Tecnología |
+| Área | Herramientas |
 |---|---|
 | Frontend | Vue 3, Vite, Vue Router, Pinia, PrimeVue y Axios |
-| Backend | Laravel 13, PHP 8.3+ y API REST bajo `/api` |
-| Autenticación | Laravel Sanctum con sesión y protección CSRF |
-| Base de datos | MySQL 8 |
-| Desarrollo local | Docker Compose con Nginx, PHP-FPM, MySQL y Redis |
+| Backend | Laravel 13 y PHP 8.3 o posterior |
+| Persistencia | MySQL 8 |
+| Autenticación | Laravel Sanctum |
+| Desarrollo local | Docker Compose, Nginx y Redis |
 
-## Distribución
+## Requisitos
 
-- `frontend/src/views`: pantallas de acceso, registro y libros.
-- `frontend/src/stores`: estado de autenticación y libros.
-- `frontend/src/api`: cliente Axios y servicios de la API.
-- `backend/app/Http`: controladores, requests y resources HTTP.
-- `backend/app/Services`: casos de uso del dominio.
-- `backend/app/Models`: modelos Eloquent.
-- `backend/routes/api.php`: contrato HTTP de la API.
-- `backend/database/migrations`: esquema versionado.
-- `netlify.toml`: compilación SPA, proxy hacia Laravel Cloud y fallback del router.
+Para el arranque recomendado:
 
-## Desarrollo local
+- Docker y Docker Compose.
+- Node.js 22.12 o posterior.
+- npm.
 
-Requisitos: Docker, Docker Compose y Node.js 22.12 o posterior.
+Para ejecutar el backend sin Docker también se necesita PHP 8.3 o posterior,
+Composer y las extensiones requeridas por Laravel.
+
+## Instalación rápida
 
 ```bash
+git clone <URL-DE-TU-FORK-O-COPIA> indice-erp
+cd indice-erp
+
 cp .env.example .env
+cp backend/.env.example backend/.env
+
 chmod +x startup.sh
 ./startup.sh
 ```
 
-Servicios:
+El script:
 
-- Frontend: `http://localhost:5173`
-- API: `http://localhost:8000/api`
-- MySQL: `localhost:3390`, base `indice_db`
+1. Construye los contenedores.
+2. Inicia PHP-FPM, Nginx, MySQL y Redis.
+3. Genera `APP_KEY` cuando sea necesario.
+4. Ejecuta las migraciones.
+5. Instala las dependencias del frontend.
+6. Inicia Vite.
 
-El servidor de Vite redirige `/api` y `/sanctum` al backend local.
+Servicios predeterminados:
 
-## Despliegue del frontend en Netlify
+| Servicio | Dirección |
+|---|---|
+| Aplicación web | `http://localhost:5173` |
+| API | `http://localhost:8000/api` |
+| MySQL | `localhost:3390` |
+| Redis | `localhost:6380` |
 
-La configuración está versionada en `netlify.toml`:
+## Instalación manual
 
-- Base directory: `frontend`
-- Build command: `npm run build`
-- Publish directory: `frontend/dist`
-- Node.js: 22.12 o posterior
+### Backend y servicios
 
-No definir `VITE_API_URL` en Netlify. Las solicitudes relativas pasan por los
-proxies `/api/*` y `/sanctum/*` antes del fallback de la SPA. Si cambia el
-dominio del backend, actualizar ambos destinos en `netlify.toml`.
+```bash
+cp .env.example .env
+cp backend/.env.example backend/.env
 
-## Despliegue del backend en Laravel Cloud
-
-Configurar la aplicación como monorepo con **Root directory** `backend` y
-runtime PHP 8.4.
-
-```text
-Build command:
-composer install --no-dev --optimize-autoloader --no-interaction
-
-Deploy command:
-php artisan migrate --force
+docker compose up -d --build
+docker compose exec app php artisan key:generate
+docker compose exec app php artisan migrate
 ```
 
-Variables del ambiente `production`:
+### Frontend
 
-```dotenv
-APP_NAME="Indice ERP"
-APP_ENV=production
-APP_DEBUG=false
-APP_URL=https://indice-erp-app-production-vjktrt.laravel.cloud
-APP_KEY=base64:GENERAR_UN_VALOR_NUEVO
-
-FRONTEND_URL=https://indice-erp.netlify.app
-CORS_ALLOWED_ORIGINS=https://indice-erp.netlify.app
-SANCTUM_STATEFUL_DOMAINS=indice-erp.netlify.app
-
-SESSION_DRIVER=database
-SESSION_SECURE_COOKIE=true
-SESSION_SAME_SITE=lax
-CACHE_STORE=database
-QUEUE_CONNECTION=database
-
-DB_CONNECTION=mysql
-MYSQL_ATTR_SSL_CA=/etc/ssl/certs/ca-certificates.crt
-LOG_CHANNEL=stderr
+```bash
+cd frontend
+npm ci
+npm run dev
 ```
 
-Generar `APP_KEY` una sola vez y conservarla entre despliegues:
+Durante el desarrollo, Vite reenvía las solicitudes `/api` y `/sanctum` al
+backend local.
+
+## Variables de entorno
+
+No versionar archivos `.env`. Los archivos incluidos en el repositorio son
+plantillas y no contienen credenciales reales.
+
+### Backend
+
+Las variables principales están en `backend/.env.example`:
+
+| Variable | Uso |
+|---|---|
+| `APP_URL` | URL pública del backend |
+| `APP_KEY` | Clave de cifrado de Laravel |
+| `DB_*` | Conexión a MySQL |
+| `REDIS_*` | Conexión a Redis |
+| `FRONTEND_URL` | URL permitida para el frontend |
+| `CORS_ALLOWED_ORIGINS` | Orígenes CORS separados por comas |
+| `SANCTUM_STATEFUL_DOMAINS` | Dominios SPA, sin protocolo |
+| `SESSION_*` | Persistencia y atributos de la cookie |
+
+Generar una clave:
 
 ```bash
 cd backend
-php artisan key:generate --show
+php artisan key:generate
 ```
 
-No definir `SESSION_DOMAIN`: la cookie debe ser host-only para funcionar a
-través del proxy de Netlify.
+### Frontend
 
-## Base de datos en Laravel Cloud
+La plantilla `frontend/.env.example` acepta:
 
-Recomendación para desarrollo compartido:
+```dotenv
+VITE_APP_NAME="Indice ERP"
+VITE_API_URL=http://localhost:8000
+```
 
-1. Crear **Laravel MySQL** en la misma región del entorno.
-2. Usar una instancia Flex con scale-to-zero y 5 GB mientras la carga sea baja.
-3. Crear la base `indice_erp` y adjuntarla al ambiente `production`.
-4. Mantener el endpoint público desactivado salvo durante una importación.
-5. Activar respaldos diarios: 2 días para pruebas y al menos 7 días al pasar a producción real.
-6. Redesplegar. Cloud inyecta `DB_HOST`, `DB_PORT`, `DB_DATABASE`,
-   `DB_USERNAME` y `DB_PASSWORD`; el deploy ejecuta las migraciones.
+`VITE_API_URL` puede omitirse cuando frontend y API se publican bajo el mismo
+origen o cuando existe un proxy para `/api` y `/sanctum`.
 
-Las sesiones, caché y colas usan inicialmente MySQL, suficiente para un
-ambiente de pruebas pequeño. Añadir Laravel Valkey y cambiar esos drivers a
-`redis` cuando existan múltiples instancias, workers permanentes o más carga.
+## API
 
-## Verificación
+Las rutas se encuentran bajo `/api`.
+
+### Públicas
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| `POST` | `/api/register` | Crear una cuenta |
+| `POST` | `/api/login` | Iniciar sesión |
+
+### Autenticadas
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| `GET` | `/api/user` | Obtener el usuario actual |
+| `POST` | `/api/logout` | Cerrar sesión |
+| `GET` | `/api/books` | Listar y filtrar libros |
+| `POST` | `/api/books` | Crear un libro |
+| `GET` | `/api/books/{id}` | Consultar un libro |
+| `PUT/PATCH` | `/api/books/{id}` | Actualizar un libro |
+| `DELETE` | `/api/books/{id}` | Eliminar un libro |
+| `GET` | `/api/books/low-stock` | Consultar stock bajo |
+
+La autenticación web usa cookies de sesión y un token CSRF. Antes de una
+operación que modifica datos, el cliente solicita `/sanctum/csrf-cookie`.
+
+## Comandos útiles
+
+### Frontend
+
+```bash
+cd frontend
+npm run dev
+npm run build
+npm run preview
+```
+
+### Backend
+
+```bash
+cd backend
+php artisan migrate
+php artisan migrate:fresh
+php artisan route:list
+php artisan test
+```
+
+Con Docker, anteponer:
+
+```bash
+docker compose exec app
+```
+
+Ejemplo:
+
+```bash
+docker compose exec app php artisan test
+```
+
+## Pruebas
 
 ```bash
 cd backend
@@ -144,11 +201,41 @@ npm ci
 npm run build
 ```
 
-Después de desplegar:
+Los tests del backend usan SQLite en memoria y no modifican la base MySQL de
+desarrollo.
 
-```bash
-curl https://indice-erp-app-production-vjktrt.laravel.cloud/up
-curl -i https://indice-erp.netlify.app/api/user
-```
+## Personalización
 
-El segundo comando debe responder `401` JSON sin sesión, no `200 text/html`.
+Para adaptar el proyecto:
+
+1. Cambiar `APP_NAME` y `VITE_APP_NAME`.
+2. Reemplazar colores, textos e iconos del frontend.
+3. Crear nuevas migraciones; no editar migraciones que ya fueron aplicadas.
+4. Añadir modelos, servicios, controladores y rutas para nuevos módulos.
+5. Incorporar roles y políticas antes de permitir acceso a varios tipos de usuario.
+6. Configurar correo, colas, almacenamiento y respaldos según el entorno.
+
+## Publicación
+
+El proyecto no depende de un proveedor específico. Para publicar una copia:
+
+1. Compilar `frontend` con `npm ci && npm run build`.
+2. Servir `frontend/dist` como SPA con fallback a `index.html`.
+3. Publicar `backend` con PHP 8.3 o posterior.
+4. Configurar MySQL y ejecutar `php artisan migrate --force`.
+5. Definir una `APP_KEY` persistente y desactivar `APP_DEBUG`.
+6. Configurar HTTPS, CORS, dominios stateful de Sanctum y cookies seguras.
+7. Ejecutar workers separados si se habilitan colas asíncronas.
+8. Mantener respaldos automatizados de la base de datos.
+
+Para autenticación Sanctum basada en cookies, frontend y backend deben compartir
+el mismo dominio superior o exponerse mediante un proxy de mismo origen.
+
+## Seguridad
+
+- No publicar `.env`, claves, contraseñas ni respaldos.
+- Mantener `APP_DEBUG=false` fuera del desarrollo local.
+- Usar HTTPS y cookies `Secure`.
+- Restringir el acceso público a MySQL.
+- Usar usuarios de base de datos con privilegios mínimos.
+- Revisar autorización, roles y políticas antes de manejar datos reales.

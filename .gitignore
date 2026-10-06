@@ -3,6 +3,9 @@
 backend/.env
 frontend/.env
 
+# Local private documentation
+.private/
+
 # Dependencies
 node_modules/
 vendor/
