@@ -6,22 +6,6 @@
   </div>
 </template>
 
-<script setup>
-import { onMounted } from 'vue';
-import { useAuthStore } from '@/stores/authStore';
-import { useRouter, useRoute } from 'vue-router';
-
-const authStore = useAuthStore();
-const router = useRouter();
-const route = useRoute();
-
-onMounted(async () => {
-  await authStore.fetchUser();
-  if (!authStore.isAuthenticated && route.path !== '/login') {
-    router.push('/login');
-  }
-});
-</script>
 
 <style>
 body {

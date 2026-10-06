@@ -4,7 +4,7 @@ import { useAuthStore } from '@/stores/authStore';
 const routes = [
     {
         path: '/',
-        redirect: '/books',
+        redirect: '/login',
     },
     {
         path: '/login',
@@ -43,24 +43,20 @@ const router = createRouter({
     routes,
 });
 
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to) => {
     const authStore = useAuthStore();
 
+    await authStore.fetchUser();
+
     if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-        try {
-            await authStore.fetchUser();
-            if (!authStore.isAuthenticated) {
-                return next('/login');
-            }
-            next();
-        } catch {
-            next('/login');
-        }
-    } else if (to.meta.guest && authStore.isAuthenticated) {
-        next('/books');
-    } else {
-        next();
+        return '/login';
     }
+
+    if (to.meta.guest && authStore.isAuthenticated) {
+        return '/books';
+    }
+
+    return true;
 });
 
 export default router;
