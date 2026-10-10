@@ -6,7 +6,6 @@ use App\Models\Book;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
-use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class BookCrudTest extends TestCase
@@ -18,13 +17,13 @@ class BookCrudTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->user = User::factory()->create();
+        $this->user = User::factory()->operator()->create();
     }
 
     #[Test]
     public function can_list_books(): void
     {
-        Sanctum::actingAs($this->user);
+        $this->actingAs($this->user, 'web');
         Book::factory()->count(5)->create();
 
         $response = $this->getJson('/api/books');
@@ -42,7 +41,7 @@ class BookCrudTest extends TestCase
     #[Test]
     public function can_create_a_book(): void
     {
-        Sanctum::actingAs($this->user);
+        $this->actingAs($this->user, 'web');
 
         $payload = [
             'title' => 'Clean Code',
@@ -78,7 +77,7 @@ class BookCrudTest extends TestCase
     #[Test]
     public function create_book_validates_required_fields(): void
     {
-        Sanctum::actingAs($this->user);
+        $this->actingAs($this->user, 'web');
 
         $response = $this->postJson('/api/books', []);
 
@@ -89,7 +88,7 @@ class BookCrudTest extends TestCase
     #[Test]
     public function create_book_validates_unique_isbn(): void
     {
-        Sanctum::actingAs($this->user);
+        $this->actingAs($this->user, 'web');
         Book::factory()->create(['isbn' => '9780132350884']);
 
         $response = $this->postJson('/api/books', [
@@ -105,7 +104,7 @@ class BookCrudTest extends TestCase
     #[Test]
     public function can_show_a_book(): void
     {
-        Sanctum::actingAs($this->user);
+        $this->actingAs($this->user, 'web');
         $book = Book::factory()->create();
 
         $response = $this->getJson("/api/books/{$book->id}");
@@ -118,7 +117,7 @@ class BookCrudTest extends TestCase
     #[Test]
     public function can_update_a_book(): void
     {
-        Sanctum::actingAs($this->user);
+        $this->actingAs($this->user, 'web');
         $book = Book::factory()->create();
 
         $response = $this->putJson("/api/books/{$book->id}", [
@@ -136,7 +135,7 @@ class BookCrudTest extends TestCase
     #[Test]
     public function can_delete_a_book(): void
     {
-        Sanctum::actingAs($this->user);
+        $this->actingAs($this->user, 'web');
         $book = Book::factory()->create();
 
         $response = $this->deleteJson("/api/books/{$book->id}");
@@ -148,7 +147,7 @@ class BookCrudTest extends TestCase
     #[Test]
     public function can_search_books(): void
     {
-        Sanctum::actingAs($this->user);
+        $this->actingAs($this->user, 'web');
         Book::factory()->create(['title' => 'Laravel Up and Running']);
         Book::factory()->create(['title' => 'Vue.js in Action']);
         Book::factory()->create(['title' => 'PHP Cookbook']);
@@ -163,7 +162,7 @@ class BookCrudTest extends TestCase
     #[Test]
     public function can_get_low_stock_books(): void
     {
-        Sanctum::actingAs($this->user);
+        $this->actingAs($this->user, 'web');
         Book::factory()->count(3)->create(['stock' => 50]);
         Book::factory()->lowStock()->count(2)->create();
 

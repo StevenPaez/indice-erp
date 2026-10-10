@@ -8,6 +8,7 @@ export const useAuthStore = defineStore('auth', () => {
     const initialized = ref(false);
 
     const isAuthenticated = computed(() => !!user.value);
+    const hasCapability = (capability) => user.value?.capabilities?.includes(capability) ?? false;
 
     async function fetchUser() {
         if (initialized.value) {
@@ -34,8 +35,9 @@ export const useAuthStore = defineStore('auth', () => {
         return data;
     }
 
-    async function register(payload) {
-        const data = await authService.register(payload);
+    async function changePassword(payload) {
+        const data = await authService.changePassword(payload);
+        user.value = data;
         return data;
     }
 
@@ -54,10 +56,11 @@ export const useAuthStore = defineStore('auth', () => {
         user,
         loading,
         isAuthenticated,
+        hasCapability,
         initialized,
         fetchUser,
         login,
-        register,
+        changePassword,
         logout,
         clearUser,
     };

@@ -23,6 +23,7 @@ import FloatLabel from 'primevue/floatlabel';
 import App from './App.vue';
 import router from './router';
 import './assets/main.css';
+import './assets/auth.css';
 
 const app = createApp(App);
 const pinia = createPinia();

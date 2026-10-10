@@ -56,8 +56,9 @@
       </form>
 
       <p class="auth-footer">
-        ¿No tienes cuenta?
-        <router-link to="/register" class="auth-link">Regístrate</router-link>
+        <router-link to="/forgot-password" class="auth-link">
+          ¿Olvidaste tu contraseña?
+        </router-link>
       </p>
     </div>
   </div>
@@ -84,8 +85,8 @@ async function handleLogin() {
   fieldErrors.value = {};
 
   try {
-    await authStore.login({ email: email.value, password: password.value });
-    router.push('/books');
+    const user = await authStore.login({ email: email.value, password: password.value });
+    router.push(user.must_change_password ? '/change-password' : '/books');
   } catch (e) {
     if (e.response?.data?.errors) {
       const errors = e.response.data.errors;
@@ -100,139 +101,3 @@ async function handleLogin() {
 }
 </script>
 
-<style scoped>
-.auth-page {
-  min-height: 100dvh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--p-surface-100);
-  padding: 1rem;
-  margin: 0;
-  box-sizing: border-box;
-}
-
-.auth-card {
-  width: 100%;
-  max-width: 380px;
-  margin: 0 auto;
-  background: var(--p-surface-0, #fff);
-  border: 1px solid var(--p-surface-200, #e5e7eb);
-  border-radius: 1rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-  padding: 2rem;
-}
-
-.auth-header {
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-  text-align: center;
-  margin-bottom: 1.5rem;
-}
-
-.auth-title {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 600;
-  line-height: 1.3;
-  color: var(--p-surface-900);
-  letter-spacing: -0.01em;
-}
-
-.auth-subtitle {
-  margin: 0;
-  font-size: 0.875rem;
-  color: var(--p-surface-500);
-  line-height: 1.5;
-}
-
-.auth-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.field-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.field-label {
-  font-size: 0.875rem;
-  font-weight: 500;
-  line-height: 1;
-  color: var(--p-surface-700);
-  user-select: none;
-}
-
-.password-wrapper {
-  position: relative;
-}
-
-.password-input {
-  padding-right: 2.5rem;
-}
-
-.password-toggle {
-  position: absolute;
-  right: 0.5rem;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border: none;
-  border-radius: 0.375rem;
-  background: transparent;
-  color: var(--p-surface-400);
-  cursor: pointer;
-  transition: color 0.15s ease;
-  padding: 0;
-}
-
-.password-toggle:hover {
-  color: var(--p-surface-600);
-}
-
-.password-toggle i {
-  font-size: 0.875rem;
-}
-
-.field-error {
-  font-size: 0.75rem;
-  color: var(--p-red-500, #ef4444);
-  line-height: 1.4;
-}
-
-.general-error {
-  font-size: 0.875rem;
-  color: var(--p-red-500, #ef4444);
-  text-align: center;
-}
-
-.submit-btn {
-  margin-top: 0.5rem;
-}
-
-.auth-footer {
-  margin: 0;
-  margin-top: 1.5rem;
-  font-size: 0.875rem;
-  text-align: center;
-  color: var(--p-surface-500);
-}
-
-.auth-link {
-  color: var(--p-primary-color);
-  text-decoration: none;
-  font-weight: 500;
-}
-
-.auth-link:hover {
-  text-decoration: underline;
-}
-</style>

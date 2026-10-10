@@ -5,7 +5,10 @@
         <h2 class="m-0">Libros</h2>
       </template>
       <template #end>
-        <Button label="Nuevo Libro" icon="pi pi-plus" @click="$router.push('/books/create')" />
+        <Button v-if="authStore.hasCapability('audit.view')" label="Auditoría" icon="pi pi-shield" severity="secondary" @click="$router.push('/audit-logs')" />
+        <Button v-if="authStore.hasCapability('users.view')" label="Usuarios" icon="pi pi-users" severity="secondary" class="ml-2" @click="$router.push('/users')" />
+        <Button v-if="authStore.hasCapability('catalog.manage')" label="Nuevo Libro" icon="pi pi-plus" class="ml-2" @click="$router.push('/books/create')" />
+        <Button label="Cambiar contraseña" icon="pi pi-key" severity="secondary" class="ml-2" @click="$router.push('/change-password')" />
         <Button label="Cerrar Sesion" icon="pi pi-sign-out" severity="secondary" class="ml-2" @click="handleLogout" />
       </template>
     </Toolbar>
@@ -35,7 +38,7 @@
               <Tag :value="slotProps.data.stock" :severity="slotProps.data.is_low_stock ? 'warn' : 'success'" />
             </template>
           </Column>
-          <Column header="Acciones">
+          <Column v-if="authStore.hasCapability('catalog.manage')" header="Acciones">
             <template #body="slotProps">
               <Button icon="pi pi-pencil" severity="info" text rounded @click="$router.push(`/books/${slotProps.data.id}/edit`)" />
               <Button icon="pi pi-trash" severity="danger" text rounded @click="confirmDelete(slotProps.data)" />

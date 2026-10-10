@@ -121,10 +121,12 @@ View / Component
 ## API y errores
 
 - La API usa JSON bajo `/api`.
-- `401` significa usuario no autenticado.
+- `401` significa que no existe una sesión válida o que la cuenta dejó de estar
+  activa.
 - `403` significa usuario autenticado sin permiso.
 - `404` puede utilizarse para ocultar recursos que el usuario no debe descubrir.
 - `422` representa validación fallida.
+- `429` representa un límite de solicitudes alcanzado.
 - Los mensajes de autenticación DEBEN ser genéricos para evitar enumeración de
   cuentas.
 - Las respuestas paginadas DEBEN mantener una estructura consistente.
@@ -134,9 +136,13 @@ View / Component
 ## Autenticación y autorización
 
 - Sanctum con cookies y CSRF es el mecanismo de la SPA propia.
+- Durante el MVP interno no se ofrece autenticación pública mediante bearer
+  tokens o tokens personales.
 - El registro público permanecerá deshabilitado durante el MVP interno.
 - Los usuarios serán creados o invitados por un administrador.
 - Roles iniciales: `admin`, `operator`, `viewer`.
+- Los roles DEBEN representarse con un backed enum PHP persistido como string;
+  no usar `ENUM` nativo de MySQL, tablas RBAC ni strings dispersos.
 - La ausencia de una regla explícita DEBE denegar acceso.
 - Aplicar mínimo privilegio y verificar permisos en cada solicitud.
 - Usar Policies para recursos y Gates solo para capacidades no ligadas a un
@@ -163,6 +169,18 @@ View / Component
 | Consultar auditoría | Sí | No | No |
 
 Toda nueva capacidad DEBE añadirse primero a esta matriz y luego implementarse.
+
+Capacidades iniciales:
+
+- `users.view` y `users.manage`: solo `admin`.
+- `audit.view`: solo `admin`.
+- `catalog.view`: todos los roles.
+- `catalog.manage`: `admin` y `operator`.
+- `inventory.view`: todos los roles.
+- `inventory.manage`: `admin` y `operator`.
+- `inventory.adjust`: solo `admin`.
+
+Las capacidades se derivan del rol y no se persisten en tablas durante el MVP.
 
 ## Auditoría y logging
 

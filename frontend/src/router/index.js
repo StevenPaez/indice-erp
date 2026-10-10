@@ -13,10 +13,22 @@ const routes = [
         meta: { guest: true },
     },
     {
-        path: '/register',
-        name: 'register',
-        component: () => import('@/views/auth/RegisterView.vue'),
+        path: '/forgot-password',
+        name: 'forgot-password',
+        component: () => import('@/views/auth/ForgotPasswordView.vue'),
         meta: { guest: true },
+    },
+    {
+        path: '/reset-password',
+        name: 'reset-password',
+        component: () => import('@/views/auth/ResetPasswordView.vue'),
+        meta: { guest: true },
+    },
+    {
+        path: '/change-password',
+        name: 'change-password',
+        component: () => import('@/views/auth/ChangePasswordView.vue'),
+        meta: { requiresAuth: true },
     },
     {
         path: '/books',
@@ -28,13 +40,25 @@ const routes = [
         path: '/books/create',
         name: 'book-create',
         component: () => import('@/views/books/BookFormView.vue'),
-        meta: { requiresAuth: true },
+        meta: { requiresAuth: true, capability: 'catalog.manage' },
     },
     {
         path: '/books/:id/edit',
         name: 'book-edit',
         component: () => import('@/views/books/BookFormView.vue'),
-        meta: { requiresAuth: true },
+        meta: { requiresAuth: true, capability: 'catalog.manage' },
+    },
+    {
+        path: '/users',
+        name: 'users',
+        component: () => import('@/views/users/UserListView.vue'),
+        meta: { requiresAuth: true, capability: 'users.view' },
+    },
+    {
+        path: '/audit-logs',
+        name: 'audit-logs',
+        component: () => import('@/views/audit/AuditLogListView.vue'),
+        meta: { requiresAuth: true, capability: 'audit.view' },
     },
 ];
 
@@ -51,6 +75,18 @@ router.beforeEach(async (to) => {
     if (to.meta.requiresAuth && !authStore.isAuthenticated) {
         return '/login';
     }
+
+    if (
+        authStore.isAuthenticated
+        && authStore.user.must_change_password
+        && to.name !== 'change-password'
+    ) {
+        return '/change-password';
+    }
+    if (to.meta.capability && !authStore.hasCapability(to.meta.capability)) {
+        return '/books';
+    }
+
 
     if (to.meta.guest && authStore.isAuthenticated) {
         return '/books';

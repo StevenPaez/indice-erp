@@ -1,15 +1,18 @@
 import apiClient from '../axios';
 
 export const authService = {
-    async register({ name, email, password, password_confirmation }) {
-        const { data } = await apiClient.post('/api/register', {
-            name, email, password, password_confirmation,
-        });
+    async login({ email, password }) {
+        const { data } = await apiClient.post('/api/login', { email, password });
         return data;
     },
 
-    async login({ email, password }) {
-        const { data } = await apiClient.post('/api/login', { email, password });
+    async forgotPassword(email) {
+        const { data } = await apiClient.post('/api/forgot-password', { email });
+        return data;
+    },
+
+    async resetPassword(payload) {
+        const { data } = await apiClient.post('/api/reset-password', payload);
         return data;
     },
 
@@ -19,6 +22,11 @@ export const authService = {
 
     async getUser() {
         const { data } = await apiClient.get('/api/user');
+        return data;
+    },
+
+    async changePassword(payload) {
+        const { data } = await apiClient.put('/api/user/password', payload);
         return data;
     },
 };
