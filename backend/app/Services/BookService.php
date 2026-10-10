@@ -27,6 +27,7 @@ class BookService
     public function update(Book $book, UpdateBookRequest $request): Book
     {
         $book->update($request->validated());
+
         return $book->fresh();
     }
 

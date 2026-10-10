@@ -10,7 +10,9 @@ use App\Models\Book;
 use App\Services\BookService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Gate;
 
 class BookController
 {
@@ -20,6 +22,8 @@ class BookController
 
     public function index(Request $request): BookCollection
     {
+        Gate::authorize('viewAny', Book::class);
+
         $books = $this->bookService->list($request->only([
             'search', 'low_stock', 'sort_by', 'sort_dir', 'per_page',
         ]));
@@ -38,6 +42,8 @@ class BookController
 
     public function show(Book $book): BookResource
     {
+        Gate::authorize('view', $book);
+
         return new BookResource($book);
     }
 
@@ -50,13 +56,17 @@ class BookController
 
     public function destroy(Book $book): JsonResponse
     {
+        Gate::authorize('delete', $book);
+
         $this->bookService->delete($book);
 
         return response()->json(null, Response::HTTP_NO_CONTENT);
     }
 
-    public function lowStock(): \Illuminate\Http\Resources\Json\AnonymousResourceCollection
+    public function lowStock(): AnonymousResourceCollection
     {
+        Gate::authorize('viewAny', Book::class);
+
         return BookResource::collection($this->bookService->getLowStock());
     }
 }

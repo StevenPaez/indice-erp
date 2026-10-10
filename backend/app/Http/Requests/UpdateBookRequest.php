@@ -8,14 +8,14 @@ class UpdateBookRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->can('update', $this->route('book')) ?? false;
     }
 
     public function rules(): array
     {
         return [
             'title' => ['sometimes', 'string', 'max:255'],
-            'isbn' => ['sometimes', 'string', 'max:20', 'unique:books,isbn,' . $this->book?->id],
+            'isbn' => ['sometimes', 'string', 'max:20', 'unique:books,isbn,'.$this->book?->id],
             'author' => ['sometimes', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'purchase_price' => ['sometimes', 'numeric', 'min:0'],

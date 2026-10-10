@@ -2,11 +2,10 @@
 
 namespace Tests\Unit\Services;
 
-use App\Http\Requests\StoreBookRequest;
 use App\Models\Book;
 use App\Services\BookService;
-use PHPUnit\Framework\Attributes\Test;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class BookServiceTest extends TestCase

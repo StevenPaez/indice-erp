@@ -2,83 +2,146 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\AuditEvent;
+use App\Http\Requests\Auth\ChangePasswordRequest;
+use App\Http\Requests\Auth\ForgotPasswordRequest;
+use App\Http\Requests\Auth\LoginRequest;
+use App\Http\Requests\Auth\ResetPasswordRequest;
+use App\Http\Resources\SessionResource;
 use App\Models\User;
+use App\Services\AuditService;
+use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AuthController
 {
-    public function register(Request $request): JsonResponse
+    public function __construct(
+        private readonly AuditService $auditService,
+    ) {}
+
+    public function login(LoginRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
-        ], [
-            'name.required' => 'El campo nombre es obligatorio.',
-            'name.max' => 'El nombre no debe superar los 255 caracteres.',
-            'email.required' => 'El campo correo electrónico es obligatorio.',
-            'email.email' => 'El correo electrónico debe ser una dirección válida.',
-            'email.max' => 'El correo electrónico no debe superar los 255 caracteres.',
-            'email.unique' => 'Este correo electrónico ya está registrado.',
-            'password.required' => 'El campo contraseña es obligatorio.',
-            'password.min' => 'La contraseña debe tener al menos 8 caracteres.',
-            'password.confirmed' => 'Las contraseñas no coinciden.',
-        ]);
+        $credentials = $request->validated();
+        $user = User::query()->where('email', $credentials['email'])->first();
 
-        $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
-        ]);
+        if (
+            $user === null
+            || ! Hash::check($credentials['password'], $user->password)
+            || ! $user->is_active
+        ) {
+            $this->auditService->record(
+                AuditEvent::LoginFailed,
+                subject: $user,
+            );
 
-        Auth::login($user);
-        $request->session()->regenerate();
-
-        return response()->json($user, Response::HTTP_CREATED);
-    }
-
-    public function login(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'email' => ['required', 'email'],
-            'password' => ['required'],
-        ], [
-            'email.required' => 'El campo correo electrónico es obligatorio.',
-            'email.email' => 'El correo electrónico debe ser una dirección válida.',
-            'password.required' => 'El campo contraseña es obligatorio.',
-        ]);
-
-        $user = User::where('email', $validated['email'])->first();
-
-        if (! $user || ! Hash::check($validated['password'], $user->password)) {
             throw ValidationException::withMessages([
                 'email' => ['Las credenciales proporcionadas son incorrectas.'],
             ]);
         }
 
-        Auth::login($user);
+        Auth::guard('web')->login($user);
         $request->session()->regenerate();
 
-        return response()->json($user);
+        $this->auditService->record(
+            AuditEvent::LoginSucceeded,
+            $user,
+            $user,
+        );
+
+        return response()->json(SessionResource::make($user)->resolve($request));
     }
 
     public function logout(Request $request): JsonResponse
     {
-        // Sanctum uses a RequestGuard for token requests, which does not
-        // implement logout(). SPA requests are authenticated by the web guard.
-        if (Auth::guard('web')->check()) {
-            Auth::guard('web')->logout();
-            $request->session()->invalidate();
-            $request->session()->regenerateToken();
-        } elseif ($request->user()?->currentAccessToken()) {
-            $request->user()->currentAccessToken()->delete();
-        }
+        $user = $request->user();
+
+        $this->auditService->record(
+            AuditEvent::Logout,
+            $user,
+            $user,
+        );
+
+        Auth::guard('web')->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
 
         return response()->json(null, Response::HTTP_NO_CONTENT);
+    }
+
+    public function changePassword(ChangePasswordRequest $request): JsonResponse
+    {
+        $user = $request->user();
+        $validated = $request->validated();
+
+        Auth::guard('web')->logoutOtherDevices($validated['current_password']);
+
+        $user->password = Hash::make($validated['password']);
+        $user->must_change_password = false;
+        $user->updated_by = $user->getKey();
+        $user->save();
+
+        $this->auditService->record(
+            AuditEvent::UserPasswordChanged,
+            $user,
+            $user,
+        );
+
+        return response()->json(SessionResource::make($user)->resolve($request));
+    }
+
+    public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
+    {
+        $email = $request->validated('email');
+        $user = User::query()->where('email', $email)->first();
+
+        Password::sendResetLink(['email' => $email]);
+
+        $this->auditService->record(
+            AuditEvent::PasswordResetRequested,
+            subject: $user,
+        );
+
+        return response()->json([
+            'message' => 'Si la cuenta existe, recibirás instrucciones para restablecer la contraseña.',
+        ]);
+    }
+
+    public function resetPassword(ResetPasswordRequest $request): JsonResponse
+    {
+        $status = Password::reset(
+            $request->only('email', 'password', 'password_confirmation', 'token'),
+            function (User $user, string $password): void {
+                $user->password = Hash::make($password);
+                $user->must_change_password = false;
+                $user->updated_by = $user->getKey();
+                $user->setRememberToken(Str::random(60));
+                $user->save();
+
+                $this->auditService->record(
+                    AuditEvent::PasswordResetCompleted,
+                    $user,
+                    $user,
+                );
+
+                event(new PasswordReset($user));
+            },
+        );
+
+        if ($status !== Password::PASSWORD_RESET) {
+            throw ValidationException::withMessages([
+                'email' => ['No se pudo restablecer la contraseña con estos datos.'],
+            ]);
+        }
+
+        return response()->json([
+            'message' => 'La contraseña fue restablecida correctamente.',
+        ]);
     }
 }

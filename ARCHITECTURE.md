@@ -9,6 +9,10 @@ producción, proveedores, credenciales ni procedimientos privados de operación.
 El contenido es una decisión de diseño y un plan. No implica que las capacidades
 mencionadas ya estén implementadas.
 
+**Estado de la prioridad 1:** el contrato S0 de identidad, capacidades y
+respuestas HTTP está congelado. Cambiar una decisión de esta sección requiere
+actualizar sus criterios de aceptación antes de implementar.
+
 ## Contexto del producto
 
 Índice ERP comienza como sistema interno para una sola empresa, una sede
@@ -133,6 +137,8 @@ compromiso de implementación inmediata.
 ### Autenticación
 
 - La SPA propia usa Sanctum con sesión, cookie segura y protección CSRF.
+- Durante el MVP interno, la SPA usa exclusivamente cookies de sesión. No se
+  ofrece autenticación pública mediante bearer tokens o tokens personales.
 - El registro público queda eliminado del contrato de la API.
 - El login acepta email y contraseña y retorna un error genérico ante credenciales
   inválidas, usuario inexistente o inactivo.
@@ -160,37 +166,58 @@ Existen dos caminos controlados:
 
 1. **Primer administrador:** comando interactivo de consola. Nunca un seeder con
    una contraseña conocida o almacenada en el repositorio.
-2. **Usuarios posteriores:** un administrador crea la cuenta. Si el correo está
-   disponible, el sistema envía un enlace de establecimiento de contraseña. Sin
-   correo, se define una contraseña temporal y el usuario debe cambiarla en el
-   primer acceso.
+2. **Usuarios posteriores:** un administrador crea la cuenta con una contraseña
+   temporal de al menos 15 caracteres. El usuario debe reemplazarla en su primer
+   acceso. La recuperación por correo permanece disponible como flujo separado
+   cuando existe un transporte configurado.
 
 El usuario no se elimina físicamente desde la aplicación. Puede desactivarse y
 reactivarse. Desactivar conserva autoría y trazabilidad histórica.
 
-### Roles y autorización
+### Roles, estados y autorización
 
-Los roles son un enum de aplicación almacenado en `users.role`; no se necesita
-una tabla de permisos ni un paquete externo para tres roles fijos.
+Los roles son un backed enum PHP almacenado como string en `users.role`; no se
+utiliza un `ENUM` nativo de MySQL, una tabla de permisos ni un paquete RBAC para
+los tres roles fijos:
 
-| Capacidad | admin | operator | viewer |
+- `admin`
+- `operator`
+- `viewer`
+
+Una cuenta tiene además un estado independiente:
+
+- **Activa:** puede autenticarse y usar las capacidades de su rol.
+- **Inactiva:** no puede autenticarse ni conservar una sesión operativa.
+
+Estar activo no concede permisos. El rol determina capacidades y la ausencia de
+una capacidad explícita deniega acceso.
+
+| Capacidad efectiva | admin | operator | viewer |
 |---|:---:|:---:|:---:|
-| Ver panel y catálogos | Sí | Sí | Sí |
-| Administrar usuarios y roles | Sí | No | No |
-| Crear o editar catálogo | Sí | Sí | No |
-| Registrar movimientos ordinarios | Sí | Sí | No |
-| Ejecutar correcciones sensibles | Sí | No | No |
-| Consultar auditoría | Sí | No | No |
+| `users.view` | Sí | No | No |
+| `users.manage` | Sí | No | No |
+| `audit.view` | Sí | No | No |
+| `catalog.view` | Sí | Sí | Sí |
+| `catalog.manage` | Sí | Sí | No |
+| `inventory.view` | Sí | Sí | Sí |
+| `inventory.manage` | Sí | Sí | No |
+| `inventory.adjust` | Sí | No | No |
+
+Durante la prioridad 1, `catalog.view` y `catalog.manage` protegen el CRUD
+existente de libros sin rediseñar su modelo. Las capacidades de inventario
+quedan reservadas para el módulo posterior y no justifican endpoints nuevos.
 
 Principios:
 
 - Denegar por defecto.
 - Verificar sujeto, acción y recurso en cada request.
 - Policies para recursos; Gates para acciones globales excepcionales.
+- Las capacidades se derivan del enum y no se persisten en tablas.
 - El frontend recibe capacidades para presentar la interfaz, no nombres de rol
   para reimplementar reglas.
-- Un usuario no puede elevar su propio rol ni desactivarse si es el último
-  administrador activo.
+- Un usuario no puede elevar su propio rol.
+- Ninguna operación puede desactivar, degradar o eliminar al último
+  administrador activo. La invariante se aplica dentro de una transacción.
 - Todo cambio de rol o estado se audita.
 
 ## Modelo conceptual de la prioridad 1
@@ -210,6 +237,29 @@ Además de los atributos actuales de identidad:
 
 Las claves `created_by` y `updated_by` son autorreferencias nullable. El borrado
 del actor no debe borrar usuarios ni auditoría.
+
+### Contrato de migración de usuarios
+
+Una nueva migración, compatible con MySQL y SQLite, añadirá las columnas sin
+editar la migración inicial ya desplegada. Todos los usuarios existentes
+recibirán de forma determinista:
+
+```text
+role = viewer
+is_active = true
+must_change_password = false
+created_by = null
+updated_by = null
+```
+
+La migración conserva las cuentas y credenciales, pero no privilegios de
+escritura implícitos. No selecciona un administrador por ID, antigüedad, email
+ni cualquier otra heurística. El primer `admin` se crea o promueve después
+mediante el comando interactivo de bootstrap.
+
+Los usuarios nuevos deben declarar rol y estado desde su caso de uso; no deben
+depender únicamente de defaults de base de datos. `created_by` y `updated_by`
+son autorreferencias nullable y nunca eliminan cuentas en cascada.
 
 ### AuditLog
 
@@ -246,7 +296,7 @@ convertir el log en una base de datos de direcciones probadas.
 
 ## Contrato API objetivo de la prioridad 1
 
-Las rutas exactas se confirmarán al implementar, preservando estas capacidades:
+Las rutas de seguridad de la prioridad 1 quedan fijadas así:
 
 | Método y recurso | Capacidad | Autorización |
 |---|---|---|
@@ -254,13 +304,15 @@ Las rutas exactas se confirmarán al implementar, preservando estas capacidades:
 | `POST /api/logout` | Cerrar sesión | Autenticado |
 | `GET /api/user` | Obtener sesión y capacidades | Autenticado y activo |
 | `PUT /api/user/password` | Cambiar contraseña propia | Autenticado y activo |
-| Password reset de Laravel | Solicitar/restablecer contraseña | Público con rate limit |
-| `GET /api/users` | Listar usuarios | Admin |
-| `POST /api/users` | Crear o invitar usuario | Admin |
-| `GET /api/users/{user}` | Consultar usuario | Admin |
-| `PUT /api/users/{user}` | Editar nombre, email o rol | Admin |
-| `PATCH /api/users/{user}/status` | Activar o desactivar | Admin |
-| `GET /api/audit-logs` | Consultar auditoría paginada | Admin |
+| `POST /api/forgot-password` | Solicitar recuperación | Público con rate limit |
+| `POST /api/reset-password` | Restablecer contraseña | Público con rate limit |
+| `GET /api/users` | Listar usuarios | `users.view` |
+| `POST /api/users` | Crear usuario con contraseña temporal | `users.manage` |
+| `GET /api/users/{user}` | Consultar usuario | `users.view` |
+| `PUT /api/users/{user}` | Editar identidad | `users.manage` |
+| `PATCH /api/users/{user}/role` | Cambiar rol | `users.manage` |
+| `PATCH /api/users/{user}/status` | Activar o desactivar | `users.manage` |
+| `GET /api/audit-logs` | Consultar auditoría paginada | `audit.view` |
 
 No habrá `POST /api/register`. La ausencia del endpoint forma parte del contrato,
 no solo de la interfaz.
@@ -268,6 +320,20 @@ no solo de la interfaz.
 La respuesta de sesión debe exponer datos del usuario y una lista de capacidades
 efectivas, por ejemplo `users.view`, `users.manage` y `audit.view`. Las Policies
 siguen siendo la fuente de verdad.
+
+### Semántica HTTP
+
+| Estado | Significado |
+|---|---|
+| `401` | No existe una sesión válida o la cuenta dejó de estar activa |
+| `403` | La sesión es válida, pero carece de capacidad para la acción |
+| `404` | El recurso no existe o no debe ser descubrible por ese usuario |
+| `422` | La entrada no cumple el contrato de validación |
+| `429` | Se alcanzó el límite de solicitudes de una operación protegida |
+
+Login y recuperación devuelven respuestas genéricas que no distinguen entre
+email inexistente, contraseña incorrecta o cuenta inactiva. Las respuestas no
+incluyen secretos ni atributos internos del modelo.
 
 ## Plan de trabajo: prioridad 1
 
@@ -277,20 +343,30 @@ criterios de aceptación.
 
 ### Fase 0 — Contrato y línea base
 
-**Objetivo:** fijar comportamiento antes de cambiar datos.
+**Estado:** contrato S0 completado.
 
-- Inventariar rutas y pruebas actuales de login, registro, sesión y logout.
-- Identificar dependencias frontend de la ruta de registro.
-- Definir enum de roles, capacidades y matriz permitida/denegada.
-- Confirmar requisitos de correo para invitación y recuperación.
-- Crear pruebas de regresión para los flujos existentes que deban conservarse.
+Decisiones congeladas:
 
-**Salida:** matriz de autorización y contrato HTTP aprobados; alcance sin rutas
+- Roles, estados y migración de usuarios existentes.
+- Matriz de capacidades permitidas y denegadas.
+- Sanctum con cookie de sesión como único contrato del MVP interno.
+- Bootstrap explícito del primer administrador.
+- Invariante transaccional del último administrador activo.
+- Semántica de `401`, `403`, `404`, `422` y `429`.
+
+La línea base inventariada al inicio conservaba el registro público, carecía de
+roles y Policies y protegía el CRUD de libros solo con `auth:sanctum`. Fases 1
+y 2 ya cerraron la persistencia, el bootstrap y la autenticación; las Policies
+se incorporan en la fase 3.
+
+**Salida:** contrato de migración, autorización y respuestas HTTP sin decisiones
 ambiguas.
 
 ### Fase 1 — Persistencia y bootstrap seguro
 
 **Objetivo:** representar roles, estado y autoría sin perder usuarios existentes.
+
+**Estado:** implementada y verificada.
 
 - Añadir campos de `User` y asignar una migración determinista a registros
   existentes.
@@ -300,9 +376,18 @@ ambiguas.
 - Implementar el comando interactivo e idempotente para el primer administrador.
 - Definir protección contra desactivar o degradar al último admin activo.
 
-**Migración propuesta:** los usuarios existentes se mantienen activos; una regla
-explícita determina cuál se promueve a `admin`. La migración no debe elegir un
-administrador de manera silenciosa en producción.
+**Migración acordada:** todos los usuarios existentes permanecen activos con
+rol `viewer`; ninguno se promueve automáticamente. El primer `admin` se crea o
+promueve de manera explícita mediante el comando interactivo de bootstrap.
+
+El bootstrap serializa ejecuciones mediante un lock del cache compartido y
+vuelve a comprobar la ausencia de un administrador dentro de una transacción.
+Los cambios posteriores de rol o estado bloquean las filas de administradores
+activos en orden determinista, aplican la invariante y escriben la auditoría en
+la misma transacción.
+
+La metadata de auditoría usa una allowlist por tipo de evento. Los modelos
+rechazan actualización y eliminación de eventos mediante Eloquent.
 
 **Salida:** modelo de datos migrable hacia adelante y un primer administrador
 sin credenciales versionadas.
@@ -310,6 +395,8 @@ sin credenciales versionadas.
 ### Fase 2 — Ciclo de autenticación
 
 **Objetivo:** cerrar el registro público y completar el ciclo seguro de sesión.
+
+**Estado:** implementada y verificada.
 
 - Eliminar endpoint, controlador y navegación de registro público.
 - Endurecer login con mensajes genéricos, rate limit y regeneración de sesión.
@@ -319,12 +406,20 @@ sin credenciales versionadas.
 - Integrar solicitud y consumo de reset mediante password broker.
 - Forzar cambio de contraseña temporal antes de permitir el resto de la app.
 
+La API usa exclusivamente la sesión web de Sanctum; se eliminó
+`personal_access_tokens`. Todas las rutas autenticadas validan que la cuenta
+continúe activa y las rutas funcionales exigen que la contraseña temporal ya
+haya cambiado. Login, logout, solicitudes y consumos de recuperación y cambios
+de contraseña generan eventos de auditoría sin secretos.
+
 **Salida:** usuario activo puede administrar su sesión; usuario inactivo o
 anónimo no accede a recursos protegidos; no existe registro público.
 
 ### Fase 3 — Autorización centralizada
 
 **Objetivo:** aplicar mínimo privilegio en el servidor.
+
+**Estado:** implementada y verificada.
 
 - Crear Policies para usuarios y para los recursos existentes.
 - Centralizar capacidades globales excepcionales en Gates.
@@ -333,6 +428,11 @@ anónimo no accede a recursos protegidos; no existe registro público.
 - Cubrir por pruebas cada combinación relevante de rol, acción y resultado.
 - Verificar ataques de IDOR y escalamiento de privilegios.
 
+`Capability` concentra la matriz; `BookPolicy` y `UserPolicy` autorizan recursos
+y los Gates exponen las capacidades globales. La sesión entrega únicamente las
+capacidades efectivas. Las denegaciones de Policies se auditan con el nombre
+estable de la ruta, sin persistir payloads.
+
 **Salida:** toda ruta protegida responde `401`, `403` o éxito de forma coherente;
 ningún control depende solo de Vue.
 
@@ -340,13 +440,21 @@ ningún control depende solo de Vue.
 
 **Objetivo:** permitir operación diaria sin acceso directo a base de datos.
 
+**Estado:** implementada y verificada.
+
 - Listado paginado con búsqueda y filtros por rol/estado.
-- Alta o invitación de usuarios.
+- Alta de usuarios mediante contraseña temporal obligatoria.
 - Edición de identidad y rol.
 - Activación y desactivación con confirmación explícita.
 - Pantalla de perfil para cambio de contraseña.
 - Estados de carga, vacío, error y validación por campo.
 - Navegación basada en capacidades.
+
+La API separa edición de identidad, cambio de rol y cambio de estado. Los casos
+de uso escriben autoría y auditoría dentro de sus transacciones y reutilizan la
+invariante bloqueante del último administrador activo. La SPA ofrece listado,
+búsqueda, filtros, alta, edición, cambio de rol y activación/desactivación solo
+cuando la sesión incluye `users.view` y `users.manage`.
 
 **Salida:** un admin completa el ciclo de usuario desde la interfaz; operator y
 viewer no descubren ni ejecutan acciones administrativas.
@@ -355,6 +463,8 @@ viewer no descubren ni ejecutan acciones administrativas.
 
 **Objetivo:** poder reconstruir quién cambió acceso y cuándo.
 
+**Estado:** implementada y verificada.
+
 - Emitir los eventos mínimos definidos en este documento.
 - Incorporar actor y autoría dentro de la misma transacción del caso de uso.
 - Añadir consulta paginada y filtrable solo para admin.
@@ -362,12 +472,25 @@ viewer no descubren ni ejecutan acciones administrativas.
 - Sanitizar campos controlados por usuario antes del logging.
 - Definir política operativa de retención fuera del código público.
 
+Cada request recibe un UUID generado por el servidor y expuesto como
+`X-Request-ID`; `AuditService` lo incorpora automáticamente cuando existe un
+contexto HTTP. La consulta `GET /api/audit-logs` acepta filtros validados por
+evento, actor, request y fechas, y solo está disponible mediante `audit.view`.
+La API expone nombres de recursos, no namespaces internos.
+
+La aplicación no implementa borrado automático ni edición de auditoría. Cada
+despliegue debe mantener fuera del repositorio una política aprobada que defina
+plazo de retención, responsables de acceso, respaldo/exportación, suspensión de
+borrado por investigación y eliminación controlada.
+
 **Salida:** cambios administrativos y accesos sensibles son trazables sin
 registrar secretos.
 
 ### Fase 6 — Verificación y salida
 
 **Objetivo:** demostrar comportamiento completo antes de desplegar.
+
+**Estado:** prioridad 1 implementada y verificada.
 
 - Ejecutar pruebas backend, Pint y build frontend.
 - Smoke test real de login, logout, cambio/reset de contraseña y sesión expirada.
@@ -394,7 +517,7 @@ de la migración.
 8. `admin`, `operator` y `viewer` obtienen exactamente las capacidades de la
    matriz.
 9. Cada acción protegida se autoriza en Laravel; Vue solo refleja capacidades.
-10. Las respuestas distinguen `401`, `403` y `422` de forma consistente.
+10. Las respuestas distinguen `401`, `403`, `404`, `422` y `429` de forma consistente.
 11. Los cambios de rol, estado y contraseña generan auditoría sin secretos.
 12. Tests, formatter, build y smoke tests del flujo real terminan correctamente.
 
@@ -407,7 +530,7 @@ de la migración.
 | Reglas distintas entre frontend/backend | Policies como fuente de verdad; frontend consume capacidades |
 | Enumeración de emails | Respuestas genéricas y rate limit en login/reset |
 | Logs con secretos o PII | Allowlist de metadatos; nunca almacenar payload completo |
-| Migración ambigua de usuarios actuales | Selección explícita del primer admin antes de desplegar |
+| Migración ambigua de usuarios actuales | Todos migran a `viewer`; el primer admin se selecciona mediante bootstrap explícito antes del corte de autorización |
 | Complejidad prematura de permisos | Enum fijo y matriz documentada; sin RBAC dinámico |
 
 ## Decisiones aplazadas

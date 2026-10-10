@@ -38,8 +38,8 @@ class Book extends Model
     {
         return $query->where(function ($q) use ($term) {
             $q->where('title', 'like', "%{$term}%")
-              ->orWhere('author', 'like', "%{$term}%")
-              ->orWhere('isbn', 'like', "%{$term}%");
+                ->orWhere('author', 'like', "%{$term}%")
+                ->orWhere('isbn', 'like', "%{$term}%");
         });
     }
 }

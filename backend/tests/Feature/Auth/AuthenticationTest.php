@@ -2,63 +2,102 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Enums\AuditEvent;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
 
 class AuthenticationTest extends TestCase
 {
     use RefreshDatabase;
 
     #[Test]
-    public function user_can_register(): void
+    public function public_registration_is_not_available(): void
     {
-        $response = $this->withHeaders(['Origin' => 'http://localhost:5173'])
-            ->postJson('/api/register', [
-                'name' => 'Test User',
-                'email' => 'test@example.com',
-                'password' => 'password',
-                'password_confirmation' => 'password',
-            ]);
+        $this->postJson('/api/register', [
+            'name' => 'Untrusted User',
+            'email' => 'untrusted@example.com',
+            'password' => 'a-long-untrusted-password',
+            'password_confirmation' => 'a-long-untrusted-password',
+        ])->assertNotFound();
 
-        $response->assertStatus(201);
-        $this->assertDatabaseHas('users', ['email' => 'test@example.com']);
-        $this->assertAuthenticated();
+        $this->assertDatabaseMissing('users', ['email' => 'untrusted@example.com']);
     }
 
     #[Test]
-    public function user_can_login(): void
+    public function active_user_can_login_with_a_normalized_email(): void
     {
         $user = User::factory()->create([
             'email' => 'test@example.com',
-            'password' => bcrypt('password'),
+            'password' => 'a-valid-test-password',
         ]);
+        $previousSessionId = session()->getId();
 
-        $response = $this->withHeaders(['Origin' => 'http://localhost:5173'])
+        $response = $this->withHeader('Origin', 'http://localhost:5173')
             ->postJson('/api/login', [
-                'email' => 'test@example.com',
-                'password' => 'password',
+                'email' => ' Test@Example.com ',
+                'password' => 'a-valid-test-password',
             ]);
 
-        $response->assertStatus(200);
+        $response->assertOk()
+            ->assertJsonFragment(['email' => 'test@example.com']);
         $this->assertAuthenticatedAs($user);
+        $this->assertNotSame($previousSessionId, session()->getId());
+        $this->assertDatabaseHas('audit_logs', [
+            'actor_id' => $user->id,
+            'event' => AuditEvent::LoginSucceeded->value,
+            'subject_id' => $user->id,
+        ]);
     }
 
     #[Test]
-    public function user_cannot_login_with_invalid_credentials(): void
+    public function invalid_credentials_and_inactive_accounts_have_the_same_response(): void
     {
         User::factory()->create([
-            'email' => 'test@example.com',
-            'password' => bcrypt('password'),
+            'email' => 'active@example.com',
+            'password' => 'a-valid-test-password',
+        ]);
+        User::factory()->inactive()->create([
+            'email' => 'inactive@example.com',
+            'password' => 'a-valid-test-password',
         ]);
 
-        $response = $this->postJson('/api/login', [
-            'email' => 'test@example.com',
-            'password' => 'wrong-password',
+        $invalid = $this->postJson('/api/login', [
+            'email' => 'active@example.com',
+            'password' => 'incorrect-password',
+        ]);
+        $inactive = $this->postJson('/api/login', [
+            'email' => 'inactive@example.com',
+            'password' => 'a-valid-test-password',
+        ]);
+        $unknown = $this->postJson('/api/login', [
+            'email' => 'unknown@example.com',
+            'password' => 'a-valid-test-password',
         ]);
 
-        $response->assertStatus(422);
+        $invalid->assertUnprocessable();
+        $inactive->assertUnprocessable();
+        $unknown->assertUnprocessable();
+        $this->assertSame($invalid->json('message'), $inactive->json('message'));
+        $this->assertSame($invalid->json('message'), $unknown->json('message'));
+        $this->assertDatabaseCount('audit_logs', 3);
+    }
+
+    #[Test]
+    public function login_is_rate_limited_by_normalized_identity_and_ip(): void
+    {
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $this->postJson('/api/login', [
+                'email' => ' RateLimited@Example.com ',
+                'password' => 'incorrect-password',
+            ])->assertUnprocessable();
+        }
+
+        $this->postJson('/api/login', [
+            'email' => 'ratelimited@example.com',
+            'password' => 'incorrect-password',
+        ])->assertTooManyRequests();
     }
 
     #[Test]
@@ -67,17 +106,39 @@ class AuthenticationTest extends TestCase
         $user = User::factory()->create();
         $this->actingAs($user);
 
-        $response = $this->getJson('/api/user');
-
-        $response->assertStatus(200)
+        $this->getJson('/api/user')
+            ->assertOk()
             ->assertJsonFragment(['email' => $user->email]);
     }
 
     #[Test]
     public function unauthenticated_user_cannot_access_profile(): void
     {
-        $response = $this->getJson('/api/user');
+        $this->getJson('/api/user')->assertUnauthorized();
+    }
 
-        $response->assertStatus(401);
+    #[Test]
+    public function logout_invalidates_the_session_and_is_audited(): void
+    {
+        $user = User::factory()->create([
+            'password' => 'a-valid-test-password',
+        ]);
+
+        $this->withHeader('Origin', 'http://localhost:5173')
+            ->postJson('/api/login', [
+                'email' => $user->email,
+                'password' => 'a-valid-test-password',
+            ])
+            ->assertOk();
+
+        $this->postJson('/api/logout')->assertNoContent();
+
+        $this->assertGuest('web');
+        $this->app['auth']->forgetGuards();
+        $this->getJson('/api/user')->assertUnauthorized();
+        $this->assertDatabaseHas('audit_logs', [
+            'actor_id' => $user->id,
+            'event' => AuditEvent::Logout->value,
+        ]);
     }
 }
